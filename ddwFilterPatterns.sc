@@ -152,6 +152,29 @@ PTimePoints : FilterPattern {
 }
 
 
+// essentially, Pfindur for value patterns
+// reads time from the thread's clock, instead of event deltas
+Pfintime : Pfindur {
+	embedInStream { |inval|
+		var stream = pattern.asStream, next,
+		startTime = thisThread.clock.beats,
+		time = { thisThread.clock.beats - startTime };
+
+		loop {
+			next = stream.next(inval);
+			if(next.isKindOf(Event)) {
+				Error("Pfintime should not be used for event patterns. Use Pfindur instead").throw;
+			};
+			if(time.value.roundUp(tolerance) < dur) {
+				inval = (next ?? { Rest(1).processRest(inval) }).yield;
+			} {
+				^inval
+			};
+		};
+	}
+}
+
+
 // record scratching goes forward and backward thru the audio stream
 // Pscratch does the same for the output values of a pattern
 // memory is finite (can only go backward so far)
