@@ -12,6 +12,8 @@ PstepDur measures time based on the input event's delta. Provided that duration 
 
 note:: It's mandatory to prepare timing information emphasis::earlier:: in the event pattern's processing chain. See the examples. ::
 
+See link::Classes/PcollectFinal:: for an example of a lookahead filter pattern.
+
 
 CLASSMETHODS::
 

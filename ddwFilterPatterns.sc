@@ -311,6 +311,31 @@ Pdelay : FilterPattern {
 }
 
 
+PcollectFinal : Pcollect {
+	var <>finalFunc;
+	*new { |func({ |x| x }), pattern, finalFunc({ |x| x })|
+		^super.new(func, pattern).finalFunc_(finalFunc)
+	}
+	embedInStream { |inval|
+		var stream = pattern.asStream, prev, next;
+		prev = stream.next(inval);
+		while {
+			// note: This may break Pkey calculations, maybe Rests too
+			// because we don't have access to the next inval right now
+			next = stream.next(inval);
+			next.notNil
+		} {
+			prev = func.value(prev, inval).processRest(inval);
+			inval = prev.yield;
+			prev = next;
+		};
+		^finalFunc.value(prev, inval).processRest(inval).yield;
+	}
+	// FuncStream implementation is not OK for this subclass
+	asStream { ^Routine { |inval| this.embedInStream(inval) } }
+}
+
+
 PpatRewrite : FilterPattern {
 	var	<>levelPattern, <>rules, <>defaultRule,
 		<>autoStreamArrays = true,
