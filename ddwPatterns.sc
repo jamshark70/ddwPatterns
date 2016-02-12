@@ -187,3 +187,41 @@ Pmcvoss : Pvoss {
 Ptempo : Pattern {
 	asStream { ^FuncStream({ thisThread.clock.tryPerform(\tempo) ?? { 1 } }) }
 }
+
+
+// Like Pstep, but assumes an event as input (with delta) -- does not refer to clock time
+// caveat: 'dur' or 'delta' *must* be set in the inval before this pattern gets called:
+// Pbind(\dur, ..., \step, PstepDur(...)) = OK
+// Pbind(\step, PstepDur(...), \dur, ...) = not OK
+
+PstepDur : Pstep {
+	var <>tolerance;
+
+	*new { |levels, durs = 1, repeats = 1, tolerance = 0.001|
+		^super.newCopyArgs(levels, durs, repeats).init.tolerance_(tolerance);
+	}
+
+	embedInStream { |inval|
+		var itemStream, durStream, item, dur, nextChange = 0, elapsed = 0;
+		repeats.value(inval).do {
+			itemStream = list.asStream;
+			durStream = durs.asStream;
+			while {
+				item = itemStream.next(inval);
+				item.notNil and: {
+					dur = durStream.next(inval);
+					dur.notNil
+				}
+			} {
+				nextChange = nextChange + dur;
+				// 'elapsed' increments, so nextChange - elapsed will get smaller
+				// when this drops below 'tolerance' it's time to move on
+				while { (nextChange - elapsed) >= tolerance } {
+					elapsed = elapsed + inval.delta;
+					inval = item.embedInStream(inval);
+				};
+			};
+		};
+		^inval
+	}
+}
