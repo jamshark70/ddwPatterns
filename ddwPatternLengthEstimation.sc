@@ -6,6 +6,30 @@
 	estimateLength { ^inf }
 }
 
++ Punop {
+	estimateLength { ^a.estimateLength }
+}
+
++ Pbinop {
+	estimateLength {
+		^if(adverb == \x) {
+			a.estimateLength * b.estimateLength
+		} {
+			min(a.estimateLength, b.estimateLength)
+		}
+	}
+}
+
++ Pnaryop {
+	estimateLength {
+		var len = a.estimateLength;
+		arglist.do { |pat|
+			len = min(len, pat.estimateLength);
+		};
+		^len
+	}
+}
+
 // some have a length argument
 + Pseries {
 	estimateLength { ^length }
@@ -31,7 +55,7 @@
 // we'll assume most of them return "repeats" events
 + ListPattern {
 	estimateLength { ^repeats }
-	
+
 	estimateLengthOfList { arg argList;
 		var len = 0, itemLen;
 		argList = argList ? list;
