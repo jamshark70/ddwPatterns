@@ -293,7 +293,7 @@ Pdelay : FilterPattern {
 	embedInStream { |inval|
 		var	dly = delay.value(inval),
 			bsize = max(maxDelay, dly) + 1,
-			buffer = Array.fill(bsize, default),
+			buffer = Array.fill(bsize, { default }),
 			stream = pattern.asStream,
 			writeI = 0, readI = dly.neg,
 			item;
