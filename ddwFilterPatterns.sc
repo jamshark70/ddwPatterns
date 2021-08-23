@@ -167,7 +167,7 @@ Pfintime : Pfindur {
 				Error("Pfintime should not be used for event patterns. Use Pfindur instead").throw;
 			};
 			if(time.value.roundUp(tolerance) < localDur) {
-				inval = (next ?? { Rest(1).processRest(inval) }).yield;
+				inval = (next ?? { Rest(1) }).yield;
 			} {
 				^inval
 			};
@@ -326,11 +326,11 @@ PcollectFinal : Pcollect {
 			next = stream.next(inval);
 			next.notNil
 		} {
-			prev = func.value(prev, inval).processRest(inval);
+			prev = func.value(prev, inval);
 			inval = prev.yield;
 			prev = next;
 		};
-		^finalFunc.value(prev, inval).processRest(inval).yield;
+		^finalFunc.value(prev, inval).yield;
 	}
 	// FuncStream implementation is not OK for this subclass
 	asStream { ^Routine { |inval| this.embedInStream(inval) } }
