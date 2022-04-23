@@ -58,7 +58,7 @@ PnNilSafe : Pn {
 // Pstutter, but based on next value of child stream
 // n-stream gets passed not the event, but the next value of the child
 // child stream still gets passed the event
-Psmartstutter : Pstutter {
+Psmartstutter : Pdup {
 	embedInStream { arg event;
 		var inevent, nn;
 
@@ -77,6 +77,8 @@ Psmartstutter : Pstutter {
 		^event;
 	}
 }
+
+Psmartdup : Psmartstutter {}
 
 
 Pdelta : FilterPattern {
