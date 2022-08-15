@@ -61,6 +61,49 @@ Pwshuf : ListPattern {
 	}
 }
 
+// like Pshuf, but repeats controls the number of members
+// of the list to be embedded. Also it will reshuffle when
+// wrapping around the boundary.
+Pnshuf : Pshuf {
+	var <>local = true;
+	var itemStream;
+
+	*new { |list, repeats = 1, local = true|
+		^super.new(list, repeats).local_(local)
+	}
+
+	embedInStream { |inval|
+		var stream, item;
+
+		var func = {
+			Routine { |inval|
+				loop {
+					list.scramble.do { |item|
+						inval = item.yield;
+					};
+				}
+			}
+		};
+
+		if(local) {
+			stream = func.value;  // new every time it's embedded
+		} {
+			if(itemStream.isNil) {
+				itemStream = func.value;
+			};
+			stream = itemStream;
+		};
+
+		repeats.value(inval).do {
+			item = stream.next(inval);
+			if(item.isNil) { ^inval };
+			inval = item.embedInStream(inval);
+		};
+
+		^inval
+	}
+}
+
 // deprecated; Pslide now has a wrap flag
 PslideNoWrap : Pslide {
 		// false = do not wrap at end

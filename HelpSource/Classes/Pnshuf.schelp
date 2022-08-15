@@ -1,0 +1,84 @@
+TITLE:: Pnshuf
+summary:: Partial-shuffle list pattern
+categories:: Streams-Patterns-Events>Patterns>List
+related:: Classes/Pshuf
+
+DESCRIPTION::
+Like link::Classes/Pshuf::, Pnshuf streams out the members of a list in random order.
+
+The differences are:
+
+list::
+## code::repeats:: is the number of items to output this time. (In Pshuf, it is the number of times to loop over the shuffled list.)
+## The list will be reshuffled automatically across repeats. The specific behavior depends upon the code::local:: flag (see below). (Pshuf maintains the same random ordering for each repeat.)
+::
+
+subsection:: "local" flag
+
+Two behaviors are available:
+
+list::
+## (default) local = true: After embedding code::repeats:: items, forget the last ordering and, the next time this pattern gets embedded into a stream, start again with a new shuffle.
+## local = false: After embedding code::repeats:: items, upon the next embedding, continue with the last ordering. That is, use all items in the list before repeating, even if they are spread out across multiple embeddings.
+::
+
+Patterns are normally supposed to be stateless, so that they can be embedded into any stream, anywhere, and each stream exhibits independent behavior. The default, local = true, follows this principle.
+
+Local = false, then, is safe only if you are sure that a particular Pnshuf instance will be embedded in only one stream at a time -- no parallel usage! If you need parallel usage and local = false, you should have a separate Pnshuf instance for each parallel stream.
+
+
+CLASSMETHODS::
+
+METHOD:: new
+Create and return a new Pnshuf instance.
+
+ARGUMENT:: list
+The list of items to be shuffled and streamed out.
+
+ARGUMENT:: repeats
+How many of these items to stream out in one embedding.
+
+ARGUMENT:: local
+If false (default), parallel-safe, but items may repeat before all the others are streamed out. If true, each ordering will be used in full, but the pattern object will not be safe for parallel streaming.
+
+INSTANCEMETHODS::
+
+METHOD:: local
+Get or set the code::local:: flag (Boolean).
+
+private:: embedInStream
+
+
+EXAMPLES::
+
+Local = true: "3, 2, 1" vs "3, 4, 2" vs "4, 2, 1" etc. are all completely independent shuffles -- hence, starting at the beginning of this output, the value 3 appears a second time, before 4 had a chance to appear.
+
+code::
+Pseq([100, Pnshuf([1, 2, 3, 4], 3)], inf).asStream.nextN(20);
+
+-> [ 100, 3, 2, 1, 100, 3, 4, 2, 100, 4, 2, 1, 100, 2, 4, 3, 100, 1, 4, 2 ]
+::
+
+With local = false, the shuffled orderings are "2, 4, 1, 3" vs "1, 2, 4, 3" vs "1, 2, 3, 4" etc -- but the interspersed 100s interrupt these.
+
+code::
+Pseq([100, Pnshuf([1, 2, 3, 4], 3, local: false)], inf).asStream.nextN(20);
+
+-> [ 100, 2, 4, 1, 100, 3, 1, 2, 100, 4, 3, 1, 100, 2, 3, 4, 100, 2, 4, 3 ]
+::
+
+As a series of pitches (non-local streaming):
+
+code::
+(
+p = Pbind(
+	\degree, Pseq([
+		Pnshuf([12, 11, 9, 8], 1, local: false),
+		Pnshuf([0, 1, 2, 3, 4], 3, local: false)
+	], inf),
+	\dur, 0.125
+).play;
+)
+
+p.stop;
+::

@@ -91,6 +91,12 @@
 	}
 }
 
+// impossible operation: we can't know which subpatterns will be embedded
+// in a given iteration
++ Pnshuf {
+	estimateLength { ^repeats }
+}
+
 // not exact -- works if there are no embedded patterns within the arrays being laced
 // otherwise the estimate will be too low
 // should be adequate for my purposes
