@@ -55,19 +55,6 @@
 // we'll assume most of them return "repeats" events
 + ListPattern {
 	estimateLength { ^repeats }
-
-	estimateLengthOfList { arg argList;
-		var len = 0, itemLen;
-		argList = argList ? list;
-		argList.do({ |item|
-			((len === inf).not and: { ((itemLen = item.estimateLength) === inf).not }).if({
-				len = len + itemLen;
-			}, {
-				len = inf
-			});
-		});
-		^len
-	}
 }
 
 // Pseq and Pshuf repeat the whole list
@@ -75,7 +62,7 @@
 	estimateLength {
 		var listLen;
 		(repeats === inf).if({ ^inf }, {
-			((listLen = this.estimateLengthOfList) === inf).if({ ^inf },
+			((listLen = list.estimateLength) === inf).if({ ^inf },
 				{ ^repeats * listLen })
 		})
 	}
@@ -85,7 +72,7 @@
 	estimateLength {
 		var listLen;
 		(repeats === inf).if({ ^inf }, {
-			((listLen = this.estimateLengthOfList) === inf).if({ ^inf },
+			((listLen = list.estimateLength) === inf).if({ ^inf },
 				{ ^repeats * listLen })
 		})
 	}
@@ -104,7 +91,7 @@
 	estimateLength {
 		var listLen;
 		(repeats === inf).if({ ^inf }, {
-			((listLen = this.estimateLengthOfList) === inf).if({ ^inf },
+			((listLen = list.estimateLength) === inf).if({ ^inf },
 				{ ^repeats * listLen })
 		})
 	}
@@ -131,8 +118,8 @@
 + Pswitch {
 	estimateLength {
 		var listLen, whichLen;
-		listLen = this.estimateLengthOfList;
-		whichLen = this.estimateLengthOfList(which);
+		listLen = list.estimateLength;
+		whichLen = which.estimateLength;
 		((listLen === inf) or: (whichLen === inf)).if({
 			^inf
 		}, {
@@ -177,5 +164,21 @@
 + Pattern {
 	interpolate { |times = 1.0, curves = \lin|
 		^Pseg(this, times, curves)
+	}
+}
+
+// support method
+
++ SequenceableCollection {
+	estimateLength {
+		var len = 0, itemLen;
+		this.do({ |item|
+			((len === inf).not and: { ((itemLen = item.estimateLength) === inf).not }).if({
+				len = len + itemLen;
+			}, {
+				len = inf
+			});
+		});
+		^len
 	}
 }
