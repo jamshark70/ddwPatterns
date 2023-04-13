@@ -24,6 +24,7 @@ Pwxrand : Pwrand {
 				runningsum < rnd
 			};
 		});
+		^inval
 	}
 }
 
