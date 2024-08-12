@@ -1,0 +1,115 @@
+TITLE:: Pvelvet
+summary:: Velvet noise pattern
+categories:: Streams-Patterns-Events>Patterns>Repetition
+related:: Classes/Pdup
+
+DESCRIPTION::
+Velvet noise is defined as a series of single +/-1 impulses, separated by random amounts of silence.
+
+Pvelvet outputs a single value from the source pattern; then, it gets the "length" of this segment (code::num::) and fills out the segment with code::num-1:: values from the code::zero:: pattern.
+
+For true velvet noise, code::zero:: should simply be 0. In this implementation, it may be a pattern of changing values to intersperse.
+
+
+CLASSMETHODS::
+
+METHOD:: new
+Create an instance.
+
+ARGUMENT:: pattern
+The source pattern for the "impulses." The default is code::Prand([-1, 1], inf)::, corresponding to the classic definition of velvet noise.
+
+ARGUMENT:: num
+The "duration" for the current impulse, measured as the number of output values (not clock time). Values will be clipped such that num >= 1.
+
+ARGUMENT:: zero
+For each "impulse," code::num-1:: values will be taken from the "zero" stream and embedded in the output. Thus the total number of events for an "impulse" will be exactly code::num::.
+
+returns:: The instance.
+
+
+INSTANCEMETHODS::
+
+private:: embedInStream, num, zero
+
+
+EXAMPLES::
+
+code::
+// audio velvet noise
+{ Dust2.ar(5000).sign }.plot;
+
+// pattern velvet noise
+Pvelvet(Prand([-1, 1], inf), Pwhite(1, 12, inf)).asStream.nextN(128).plot;
+
+// same, but less convenient to write
+Pseq([
+	Prand([-1, 1], 1),
+	Pdup(Pwhite(0, 11, 1), 0)
+], inf).asStream.nextN(128).plot;
+
+// melody interspersed with rests
+TempoClock.tempo = 125/60;
+
+(
+p = Pbind(
+	\dur, 0.25,
+	\legato, 0.6,
+	\degree, Pvelvet(
+		Pvoss(4, 11, 4).round,
+		Pwhite(1, 5, inf),
+		0
+	)
+).play;
+)
+
+p.stop;
+
+// melody with accents
+(
+p = Pbind(
+	\dur, 0.25,
+	\legato, 0.6,
+	\degree, Pvelvet(
+		Pvoss(4, 11, 4).round,
+		Pwhite(1, 5, inf),
+		Pvoss(-7, 0, 4).round
+	)
+).play;
+)
+
+p.stop;
+
+
+// applied to an event pattern, with rests
+(
+p = (Pbind(
+	\dur, 0.25,
+	\legato, 0.6
+) <> Pvelvet(
+	Pbind(\degree, Pwhite(-7, 7, inf)),
+	Pwhite(1, 5, inf),
+	(degree: \rest)
+)).play;
+)
+
+p.stop;
+
+
+// parallelize for more fun
+(
+p = Ppar(Array.fill(5, { |i|
+	Pbind(
+		\dur, 0.25,
+		\legato, 0.6,
+		\pan, i.linlin(0, 4, -0.7, 0.7)
+	) <> Pvelvet(
+		Pbind(\degree, Pwhite(-2, 2, inf) + (i*5 - 7)),
+		Pwhite(5, 9, inf),
+		(degree: \rest)
+	)
+})).play;
+)
+
+p.stop;
+::

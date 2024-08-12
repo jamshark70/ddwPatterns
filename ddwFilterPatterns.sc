@@ -400,3 +400,42 @@ PpatRewrite : FilterPattern {
 		^result.asStream.collect { |item| outputs[level].add(item); item }.embedInStream(inval);
 	}
 }
+
+// inspired by velvet noise
+// velvet noise is isolated +/-1s with random counts of 0 in between
+// this pattern outputs successive source pattern values,
+// with 'num' duplicates of some other value in between
+// for completeness these are all patterns
+
+Pvelvet : FilterPattern {
+	var <>num,  // should be >= 1
+	<>zero;
+
+	*new { |pattern(Prand([-1, 1], inf)), num = 1, zero = 0|
+		^super.new(pattern).num_(num).zero_(zero)
+	}
+
+	embedInStream { |inval|
+		var stream = pattern.asStream;
+		var numStream = num.asStream;
+		var zeroStream = zero.asStream;
+		var cleanup = EventStreamCleanup.new;
+		var value, count;
+
+		loop {
+			value = stream.next(inval);
+			if(value.isNil) { ^cleanup.exit(inval) };
+			cleanup.update(value);
+			inval = value.yield;
+
+			count = numStream.next(inval);
+			if(count.isNil) { ^cleanup.exit(inval) };
+			max(count - 1, 0).do {
+				value = zeroStream.next(inval);
+				if(value.isNil) { ^cleanup.exit(inval) };
+				cleanup.update(value);
+				inval = value.yield;
+			};
+		}
+	}
+}
