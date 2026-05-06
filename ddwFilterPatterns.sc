@@ -439,3 +439,84 @@ Pvelvet : FilterPattern {
 		}
 	}
 }
+
+
+// "Let's do the time warp again"
+
+PwarpDur : FilterPattern {
+	var <>cycleDur, <>curve, <>midpoint;
+	var <>repeats, <>tolerance;
+	var <>clip;
+
+	*new { |pattern, cycleDur = 4, curve = 1.7, midpoint = 0.5, repeats = 1,
+		clip = true, tolerance = 0.001|
+		^super.new(pattern).curve_(curve).midpoint_(midpoint)
+		.cycleDur_(cycleDur).repeats_(repeats).tolerance_(tolerance).clip_(clip)
+	}
+
+	embedInStream { |inval|
+		var durStream = pattern.asStream;
+		var dur, now = 0, next;
+		// entering embedInStream, we assume we're on the barline
+		var nowWarped = 0, nextWarped;
+
+		repeats.value(inval).do { |count|
+			var cycle = cycleDur.value(inval);
+			var margin = tolerance.value(inval);
+			var localCurve = curve.value(inval);
+			var localMid = midpoint.value(inval);
+			var clipSym = \none;
+			var outDur, remaining;
+
+			// never true on first repeat; should be true for subsequent repeats
+			if(cycle - now < margin) {
+				now = now % cycle;
+				nowWarped = this.warp(now, cycle, localCurve, localMid, clipSym);
+			};
+
+			while {
+				(cycle - now) > margin and: {
+					dur = durStream.next(inval);
+					dur.notNil
+				}
+			} {
+				next = now + dur;
+
+				if(clip.next(inval)) {
+					next = min(next, cycle);
+					clipSym = \minmax;
+				};
+
+				nextWarped = this.warp(next, cycle, localCurve, localMid, clipSym);
+
+				outDur = nextWarped - nowWarped;
+
+				// if clipping to the cycle length, then we add a bit
+				// when next gets close enough to cycle
+				// (the 'stop' test is done based on un-warped times)
+				// note that '>' avoids performing a zero adjustment
+				if(clipSym == \minmax and: { (margin - cycle + next) > 0 }) {
+					outDur = outDur + (cycle - nextWarped);
+					nextWarped = cycle;
+					next = cycle;
+				};
+
+				inval = outDur.yield;
+
+				nowWarped = nextWarped;
+				now = next;
+			};
+		};
+	}
+
+	warp { |value = 0, cycle = 4, curve = 1.7, mid = 0.5, clip = \minmax|
+		value = value / cycle;
+		^if(value < mid or: { value > 1 and: { mid >= 0.98 } }) {
+			value.lincurve(0, mid, 0, mid, curve.neg, clip) * cycle
+		} {
+			value.lincurve(mid, 1, mid, 1, curve, clip) * cycle
+		};
+	}
+
+	storeArgs { ^[pattern, cycleDur, curve, midpoint, repeats, clip, tolerance] }
+}

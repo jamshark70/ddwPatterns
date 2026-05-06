@@ -1,0 +1,360 @@
+TITLE:: PwarpDur
+summary:: Warps a series of durations, preserving the total expected duration
+categories:: Streams-Patterns-Events>Patterns>Time
+related:: Classes/Psync
+
+DESCRIPTION::
+
+"It's just a jump to the left..."
+
+PwarpDur takes a stream of linear durations as input, and warps the timeline so that constant input durations accelerate or decelerate at the output.
+
+Input durations are given as the code::pattern::. code::cycleDur:: is the total duration of the time period to be warped. Within that duration, a midpoint is specified as a normalized 0.0 to 1.0 value (where 0.5 is the middle of the cycle duration).
+
+Then a piecewise function is applied to the running sum of the durations (code::t:: is the discrete integral of the incoming durations):
+
+definitionlist::
+## 0 <= t < midpoint || code::t.lincurve(0, midpoint, 0, midpoint, curve.neg)::
+## midpoint <= t <= 1 || code::t.lincurve(midpoint, 1, midpoint, 1, curve)::
+::
+
+A positive curve will produce first acceleration, followed by deceleration past the midpoint. A negative curve produces the opposite. Midpoint == 0 or 1 suppresses one or the other branch and produces only acceleration or deceleration (as in link::#Bucephalus bouncing ball::).
+
+See link::#Visualizing the time warp:: for a more intuitive visual understanding of the interaction between the curve and midpoint parameters.
+
+CLASSMETHODS::
+
+METHOD:: new
+Create a new PwarpDur instance.
+
+ARGUMENT:: pattern
+A pattern returning single numbers. These are the incoming, unwarped time durations.
+
+ARGUMENT:: cycleDur
+A number, function or stream, giving the total cycle length (in beats) for this repeat. (This is polled once per repeat.)
+
+ARGUMENT:: curve
+A number, function or stream, giving the curve value for this repeat. (This is polled once per repeat.)
+
+ARGUMENT:: midpoint
+A number, function or stream, giving the curve value for this repeat. (This is polled once per repeat.)
+
+ARGUMENT:: repeats
+A number, function or stream, specifying how many cycles to perform. (This is polled once, when PwarpDur takes control.)
+
+ARGUMENT:: clip
+A boolean, function or stream. (This is polled once per repeat.) If true on this repeat, the final duration will be clipped so that the total input and output durations == cycleDur. If false, the input and output durations may exceed cycleDur. (Note: Because of the exponential nature of the mapping function, if the final part of the cycle decelerates, an unclipped final duration might map onto a much longer duration than you expect. Be careful.)
+
+ARGUMENT:: tolerance
+A number, function or stream, for "fuzzy equals" at the end of the cycle. (This is polled once per repeat.) That is, if an output value would put the next time point within code::tolerance:: of code::cycleDur::, then it will round up to code::cycleDur:: and end this cycle.
+
+
+returns:: A PwarpDur instance.
+
+
+INSTANCEMETHODS::
+
+private:: curve, midpoint, tolerance, cycleDur, embedInStream, warp, clip, repeats, storeArgs
+
+
+
+EXAMPLES::
+
+subsection:: Curve
+
+Try different curve values. If curve is closer to 0, the warp is very mild. 1.5 to 2.0 is probably as high as you want to go most of the time. Empirically, 3.0 usually sounds too extreme to my ear.
+
+code::
+(
+p = Pbind(
+	\degree, Pseq([0, 2, 4, 5, 8], inf),
+	\dur, PwarpDur(0.125, 4, curve: 1.5, midpoint: 0.5, repeats: 3),
+	\legato, 1.5
+).play;
+)
+::
+
+subsection:: Midpoint
+
+code::
+// midpoint = 0.5, positive curve: accel-then-decel
+(
+p = Pbind(
+	\degree, Pseq([0, 2, 4, 5, 8], inf),
+	\dur, PwarpDur(0.125, 4, 1.8, 0.5, 3),
+	\legato, 1.5
+).play;
+)
+
+// midpoint = 0.8, positive curve: longer accel, then quick decel
+(
+p = Pbind(
+	\degree, Pseq([0, 2, 4, 5, 8], inf),
+	\dur, PwarpDur(0.125, 4, 1.8, 0.8, 3),
+	\legato, 1.5
+).play;
+)
+
+// midpoint = 1, positive curve: full-bar accel
+(
+p = Pbind(
+	\degree, Pseq([0, 2, 4, 5, 8], inf),
+	\dur, PwarpDur(0.125, 4, 1.8, 1, 3),
+	\legato, 1.5
+).play;
+)
+
+// guess what midpoint 0 will do? (You can tweak that yourself)
+::
+
+subsection:: Flowing arpeggiators
+
+Note that, in this example and the next, PwarpDur works within a normalized 0.0-1.0 cycle, which is then scaled up according to 'dur' (expressing directly the idea of "18 to 30 notes within the specified duration").
+
+code::
+(
+p = Pspawner { |sp|
+	var notes, dur;
+	loop {
+		notes = Pseries(
+			rrand(-9, -5),
+			Pconst(16, Pwrand([1, 2, 3, 4], [1, 4, 4, 2].normalizeSum, inf)),
+			inf
+		).asStream.all;
+		dur = exprand(2.5, 6.0);
+		sp.par(Pbind(
+			\instrument, \default,
+			\degree, Pn(Pshuf(notes, 1), inf),
+			\pan, sin(Ptime() * rrand(0.8, 1.5) + rrand(0, 2pi)),
+			\dur, PwarpDur(
+				1 / rrand(18, 30),
+				cycleDur: 1,
+				curve: rrand(1.5, 2.2) * #[-1, 1].choose,
+				midpoint: rrand(0.3, 0.7)
+			) * dur,
+			\sustain, 3.7
+		));
+		sp.wait(dur * rrand(1.5, 2.8))
+	};
+}.play;
+
+e = {
+	var in = In.ar(0, 2);
+	var dly = 0.65 * CombC.ar(in, 2, [1.75, 1.25], 10);
+	var mix = in + dly;
+	dly + (0.45 * FreeVerb2.ar(mix[0], mix[1], 1, 0.97, 0.25));
+}.play(target: s.defaultGroup, addAction: \addToTail);
+)
+
+p.stop;
+
+e.free;
+::
+
+subsection:: Bucephalus bouncing ball
+
+An obligatory attempt, whenever acceleration is involved.
+
+code::
+(
+SynthDef(\buce, { |out, freq = 70, ratio = 4.44, dropTime = 0.07, hold = 0.05, rel = 0.04,
+	preamp = 7.94, feedback = 1.37, amp = 0.1, pan = 0|
+	var eg = EnvGen.ar(Env([0, 1, 0.7, 0], [0.005, hold, rel], -4), doneAction: 2);
+	var freqEg = EnvGen.ar(Env([1, ratio, 1], [0.001, dropTime], \exp));
+	var fb = LocalIn.ar(1) * feedback;
+	var sig = SinOsc.ar(freq * freqEg, fb % 2pi) * eg;
+	sig = (sig * preamp.dbamp).tanh;
+	LocalOut.ar(sig);
+	sig = Pan2.ar(sig, pan, amp);
+	Out.ar(out, sig * amp);
+}).add;
+)
+
+(
+p = Pspawner { |sp|
+	var dur;
+	loop {
+		dur = rrand(2.5, 5.0);
+		sp.seq(Pbind(
+			\instrument, \buce,
+			\freq, exprand(60, 120),
+			\ratio, exprand(4.0, 5.5),
+			\dur, dur * PwarpDur(1 / rrand(16, 25), cycleDur: 1, curve: 2.1, midpoint: 1),
+			\amp, 0.27
+		));
+	}
+}.play;
+)
+
+p.stop;
+
+
+// or poly version
+(
+p = Pspawner { |sp|
+	var dur;
+	var side = Pdup({ rrand(1, 2) }, Pseq([-1, 1], inf, 2.rand)).asStream;
+	loop {
+		dur = rrand(2.5, 5.0);
+		sp.par(Pbind(
+			\instrument, \buce,
+			\freq, exprand(60, 120),
+			\ratio, exprand(4.0, 5.5),
+			\dur, dur * PwarpDur(1 / rrand(16, 25), cycleDur: 1, curve: 2.1, midpoint: 1),
+			\amp, 0.2,
+			\pan, rrand(0.55, 0.9) * side.next
+		));
+		sp.wait(dur * exprand(0.4, 0.65));
+	}
+}.play;
+)
+
+p.stop;
+::
+
+subsection:: Visualizing the time warp
+
+This code block lets you see the effect of the curve and midpoint parameters. Equally spaced sixteenth notes are shown on the Y axis, and mapped via a sigmoid transfer function onto the warped durations. Read the resulting rhythm on the X axis (left to right).
+
+The "Play" button will repeat a C major scale using the warped timing. Note that, to prevent negative durations, the playback warp will update only once per bar; changes to the sliders during playback will not be audible until the next bar.
+
+code::
+(
+var numSteps = 16;
+var curve, curveNum, curveSl, curveSpec = [-4, 4].asSpec;
+var midpt, midNum, midSl;
+var plot;
+var step, goButton, player;
+var green = Color.green, black = Color.black, grey = Color.gray(0.65);
+
+w = Window("Let's do the time warp", Rect(800, 200, 600, 450)).front;
+w.layout = VLayout(
+	HLayout(
+		goButton = Button().fixedWidth_(60),
+		VLayout(
+			HLayout(
+				StaticText().fixedWidth_(80).align_(\center).string_("curve"),
+				curveNum = NumberBox().fixedWidth_(60),
+				curveSl = Slider().orientation_(\horizontal).fixedHeight_(25)
+			),
+			HLayout(
+				StaticText().fixedWidth_(80).align_(\center).string_("midpoint"),
+				midNum = NumberBox().fixedWidth_(60),
+				midSl = Slider().orientation_(\horizontal).fixedHeight_(25)
+			)
+		)
+	),
+	plot = UserView()
+);
+
+curve = 0;
+curveNum.value_(0)
+.action_({ |view|
+	curve = view.value.clip(-4, 4);
+	curveSl.value = curveSpec.unmap(curve);
+	plot.refresh;
+});
+
+curveSl.value_(0.5)
+.action_({ |view|
+	curve = curveSpec.map(view.value);
+	curveNum.value = curve;
+	plot.refresh;
+});
+
+midpt = 0.5;
+midNum.value_(midpt)
+.action_({ |view|
+	midpt = view.value.clip(0, 1);
+	midSl.value = midpt;
+	plot.refresh;
+});
+
+midSl.value_(midpt)
+.action_({ |view|
+	midpt = view.value;
+	midNum.value = midpt;
+	plot.refresh;
+});
+
+goButton.states_([
+	["Play"],
+	["Stop", Color.black, Color(0.7, 1, 0.7)]
+])
+.action_({ |view|
+	if(view.value > 0) {
+		player = Pn(Plazy {
+			Pbind(
+				\degree, Pn(Pseries(-7, 1, 16), inf),
+				\step, Pfunc { |ev|
+					step = ev[\degree] + 7;
+					{ plot.refresh }.defer(s.latency);
+				},
+				\dur, PwarpDur(0.25, 4, curve, midpt, 1)
+			)
+		}, inf).play;
+	} {
+		player.stop;
+		step = nil;
+		plot.refresh
+	}
+});
+
+plot.background_(Color.white)
+.drawFunc = { |view|
+	var bounds = view.bounds.moveTo(0, 0);
+	var width = bounds.width, height = bounds.height;
+	var strHeight = 30;
+	var normToXY = { |coord, dimen|
+		coord * (dimen - strHeight) + strHeight
+	};
+
+	var env = Env([0, midpt, 1], [midpt, 1 - midpt], [curve.neg, curve]);
+	var curveResolution = numSteps * 8;
+
+	// relative to 0, 0
+	Pen.translate(strHeight * 0.5, height * 0.5)
+	.rotate(-0.5pi)
+	.stringCenteredIn("Equal durations in",
+		Rect(height * -0.5, strHeight * -0.5, height, strHeight),
+		Font.default, black
+	);
+
+	Pen.rotate(0.5pi).translate(strHeight * -0.5, height * -0.5)
+	.stringCenteredIn("Warped durations out",
+		Rect(0, 0, width, strHeight),
+		Font.default, black
+	);
+
+	Pen.color_(grey)
+	.moveTo(Point(0, height));
+	curveResolution.do { |i|
+		y = i / curveResolution;
+		x = env[y];
+		Pen.lineTo(Point(normToXY.(x, width), normToXY.(1.0 - y, height)));
+	};
+	Pen.stroke;
+
+	Pen.color_(black);
+
+	numSteps.do { |i|
+		var y = i / numSteps;
+		var y2 = 1 - y;
+		var x = env[y];
+
+		if(i == step) {
+			Pen.color = green;
+		} {
+			Pen.color = black;
+		};
+
+		Pen.moveTo(Point(normToXY.(0, width), normToXY.(y2, height)))
+		.lineTo(Point(normToXY.(x, width), normToXY.(y2, height)))
+		.lineTo(Point(normToXY.(x, width), normToXY.(0, height)))
+		.stroke;
+	};
+};
+
+w.onClose_({ player.stop });
+)
+::
