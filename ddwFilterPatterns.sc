@@ -507,6 +507,7 @@ PwarpDur : FilterPattern {
 				now = next;
 			};
 		};
+		^inval
 	}
 
 	warp { |value = 0, cycle = 4, curve = 1.7, mid = 0.5, clip = \minmax|
