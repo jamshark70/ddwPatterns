@@ -203,6 +203,7 @@ Pvoss : Pattern {
 				/ localGenerators * (hi - lo) + lo
 		).embedInStream(inval);
 	}
+	storeArgs { ^[lo, hi, generators, length] }
 }
 
 Pmcvoss : Pvoss {
